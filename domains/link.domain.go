@@ -2,10 +2,12 @@ package domains
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"parse_photo_go/models"
 
 	"github.com/uptrace/bun"
+	"modernc.org/sqlite"
 )
 
 type LinksDbService struct {
@@ -26,17 +28,20 @@ func (s *LinksDbService) CreateLink(path string, filename string) error {
 		Name:         filename,
 		IsDownloaded: false,
 	}
+	query := s.db.NewInsert().Model(&link)
 
-	_, err := s.db.NewInsert().Model(&link).Ignore().Exec(ctx)
+	_, err := query.Exec(ctx)
 
 	if err != nil {
-		if err.Error() == "UNIQUE constraint failed: links.path" {
-			fmt.Println("Link already exists:", path)
-			return fmt.Errorf("link already exists")
+		var sqliteErr *sqlite.Error
+		if errors.As(err, &sqliteErr) {
+			if sqliteErr.Code() == 2067 { // 2067 = SQLITE_CONSTRAINT_UNIQUE
+				fmt.Println("Link already exists:", path)
+				return fmt.Errorf("link already exists")
+			}
 		}
-
-		fmt.Println("Error inserting link:", err)
-		return fmt.Errorf("error inserting link: %w", err)
+		// Обработка других ошибок
+		return fmt.Errorf("unexpected db error: %w", err)
 	}
 
 	return nil
@@ -59,7 +64,6 @@ func (s *LinksDbService) GetAll(isReachable, showDuplicate bool) ([]models.LinkW
 	} else {
 		query = query.Where("l.duplicate_id IS NULL")
 	}
-	// fmt.Println("🚀 ~ file: link.domain.go ~ line 39 ~ func ~ query : ", query)
 
 	err := query.Scan(ctx, &links)
 	if err != nil {
@@ -71,8 +75,13 @@ func (s *LinksDbService) GetAll(isReachable, showDuplicate bool) ([]models.LinkW
 }
 
 func (s *LinksDbService) Remove(id int64) error {
-	// implementation for removing a link from the database
-	// For now, just returning nil error
+	ctx := context.Background()
+
+	query := s.db.NewDelete().Model(&models.Link{}).Where("id= ?", id)
+	_, err := query.Exec(ctx)
+	if err != nil {
+		fmt.Println("Error deleting link:", err)
+	}
 	return nil
 }
 

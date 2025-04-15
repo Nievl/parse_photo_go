@@ -31,7 +31,7 @@ type Link struct {
 	Mediafiles           int       `bun:"mediafiles,default:0" json:"mediafiles"`
 	DateUpdate           time.Time `bun:"date_update,default:current_timestamp" json:"dateUpdate"`
 	DateCreate           time.Time `bun:"date_create,default:current_timestamp" json:"dateCreate"`
-	IsReachable          bool      `bun:"is_reachable,default:0" json:"isReachable"`
+	IsReachable          bool      `bun:"is_reachable,default:1" json:"isReachable"`
 	DuplicateID          *int      `bun:"duplicate_id,nullzero" json:"duplicateId,omitempty"`
 }
 

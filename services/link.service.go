@@ -53,7 +53,7 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	}
 	isOsosedki := isOsosedkiDomain(link.Path)
 	var isTelegraph string
-	if strings.Index(link.Path, "telegra.ph") != -1 {
+	if strings.Contains(link.Path, "telegra.ph") {
 		isTelegraph = "telegra.ph"
 	}
 	urls := getMediaUrls(page, isOsosedki, isTelegraph)
@@ -123,7 +123,7 @@ func checkURL(url string) ([]string, error) {
 }
 
 func isOsosedkiDomain(url string) bool {
-	return strings.Index(url, "ososedki.com") != -1
+	return strings.Contains(url, "ososedki.com")
 }
 
 func getMediaUrls(page *goquery.Document, absoluteOnly bool, domain string) []string {

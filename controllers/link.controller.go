@@ -26,7 +26,7 @@ func (c *LinkController) Create(ctx *gin.Context) {
 
 	err := c.linkService.Create(link)
 	if err != nil {
-		ctx.JSON(400, helpers.ResultMaker("Failed to create link"+err.Error()))
+		ctx.JSON(400, helpers.ResultMaker("Failed to create link: \n"+err.Error()))
 		return
 	} else {
 		ctx.JSON(200, helpers.ResultMaker("Link created successfully"))
