@@ -91,10 +91,16 @@ func (s *LinksDbService) TagUnreachable(id int64, reachable bool) error {
 	return nil
 }
 
-func (s *LinksDbService) GetOne(id int64) models.Link {
-	// implementation for downloading files for a link by id
-	// For now, just returning nil error
-	return models.Link{}
+func (s *LinksDbService) GetOne(id int64) (*models.Link, error) {
+	ctx := context.Background()
+	var link models.Link
+	err := s.db.NewSelect().Model(&link).Where("id=?", id).Scan(ctx)
+	if err != nil {
+		fmt.Println("Error fetching link:", err)
+		return nil, fmt.Errorf("link not found")
+	}
+
+	return &link, nil
 }
 
 func (s *LinksDbService) UpdateFilesNumber(id int64, link models.UpdateLinkDto) (bool, error) {

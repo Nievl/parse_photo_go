@@ -46,7 +46,10 @@ func (s *LinkService) Remove(id int64) error {
 }
 
 func (s *LinkService) DownloadFiles(id int64) error {
-	link := s.linkDbService.GetOne(id)
+	link, err := s.linkDbService.GetOne(id)
+	if err != nil {
+		return fmt.Errorf("failed to get link: %s", err.Error())
+	}
 	page, err := getPage(link.Path)
 	if err != nil {
 		return fmt.Errorf("failed to fetch page: %s", err.Error())
