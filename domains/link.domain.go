@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"parse_photo_go/models"
+	"parse_photo_go/utils"
+	"time"
 
 	"github.com/uptrace/bun"
 	"modernc.org/sqlite"
@@ -27,6 +29,8 @@ func (s *LinksDbService) CreateLink(path string, filename string) error {
 		Path:         path,
 		Name:         filename,
 		IsDownloaded: false,
+		DateCreate:   time.Now(),
+		DateUpdate:   time.Now(),
 	}
 	query := s.db.NewInsert().Model(&link)
 
@@ -86,8 +90,17 @@ func (s *LinksDbService) Remove(id int64) error {
 }
 
 func (s *LinksDbService) TagUnreachable(id int64, reachable bool) error {
-	// implementation for tagging a link as unreachable in the database
-	// For now, just returning nil error
+	ctx := context.Background()
+	query := s.db.NewUpdate().Model(&models.Link{}).
+		Set("is_reachable = ?", reachable).
+		Set("date_update = ?", utils.DateConvert()).
+		Where("id = ?", id)
+	_, err := query.Exec(ctx)
+	if err != nil {
+		fmt.Println("Error updating link:", err)
+		return fmt.Errorf("link not found")
+	}
+
 	return nil
 }
 
@@ -103,8 +116,20 @@ func (s *LinksDbService) GetOne(id int64) (*models.Link, error) {
 	return &link, nil
 }
 
-func (s *LinksDbService) UpdateFilesNumber(id int64, link models.UpdateLinkDto) (bool, error) {
-	// implementation for updating the number of files for a link by id
-	// For now, just returning nil error
-	return false, nil
+func (s *LinksDbService) UpdateFilesNumber(id int64, link models.UpdateLinkDto) error {
+	ctx := context.Background()
+	query := s.db.NewUpdate().Table("links").
+		Set("is_downloaded = ?", link.IsDownloaded).
+		Set("progress = ?", link.Progress).
+		Set("mediafiles = ?", link.Mediafiles).
+		Set("downloaded_mediafiles = ?", link.DownloadedMediafiles).
+		Set("date_update = ?", utils.DateConvert()).
+		Where("id = ?", id)
+	_, err := query.Exec(ctx)
+	if err != nil {
+		fmt.Println("Error updating link:", err)
+		return fmt.Errorf("link not found")
+	}
+
+	return nil
 }
