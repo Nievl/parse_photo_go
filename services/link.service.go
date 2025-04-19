@@ -66,6 +66,8 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	}
 	var downloadedCount, totalFiles int
 
+	downloadedMediafiles := make([]models.CreateMediafileDto, 0, len(urls))
+
 	for _, url := range urls {
 		cleanUrl := strings.Split(url, "?")[0]
 		fileName := filepath.Base(cleanUrl)
@@ -80,22 +82,37 @@ func (s *LinkService) DownloadFiles(id int64) error {
 			fullUrl = link.Path + url
 		}
 
-		downloadedMediafiles := make([]models.CreateMediafileDto, 0, len(urls))
-
 		if _, err := os.Stat(filePath); os.IsNotExist(err) {
 			fullUrl = getHighResUrl(fullUrl)
 			res, err := s.mediafilesService.DownloadFile(fullUrl, filePath, link.ID)
 			if err != nil {
 				log.Fatalf("failed to download file: %s", err.Error())
+			} else {
+				downloadedMediafiles = append(downloadedMediafiles, res)
+				downloadedCount++
 			}
-			downloadedMediafiles = append(downloadedMediafiles, res)
-			downloadedCount++
 
 		} else {
 			downloadedCount++
 			continue
 		}
 
+	}
+
+	linkDto := models.UpdateLinkDto{
+		IsDownloaded:         downloadedCount == totalFiles,
+		Progress:             ((downloadedCount / totalFiles) * 100),
+		Mediafiles:           totalFiles,
+		DownloadedMediafiles: downloadedCount,
+	}
+
+	s.linkDbService.UpdateFilesNumber(id, linkDto)
+
+	for _, mediafile := range downloadedMediafiles {
+		err := s.mediafilesService.Create(mediafile)
+		if err != nil {
+			fmt.Printf("failed to create mediafile: %s\n", err.Error())
+		}
 	}
 
 	return nil
@@ -106,9 +123,74 @@ func (s *LinkService) ScanFilesForLink(id int64) error {
 	return nil
 }
 
-func (s *LinkService) CheckDownloaded(id int64) (bool, error) {
-	// implementation for checking if files are downloaded for a link by id
-	return false, nil
+func (s *LinkService) CheckDownloaded(id int64) (string, error) {
+	link, err := s.linkDbService.GetOne(id)
+	if err != nil {
+		return "", fmt.Errorf("failed to get link: %s", err.Error())
+	}
+
+	page, _ := getPage(link.Path)
+	dirPath := filepath.Join("result", link.Name)
+	dir, err := os.Stat(dirPath)
+	if os.IsNotExist(err) {
+		dir = nil
+	}
+
+	if dir != nil && page == nil {
+		files, err := os.ReadDir(dirPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read directory: %s", err.Error())
+		}
+		if len(files) > 0 {
+			linkDto := models.UpdateLinkDto{
+				IsDownloaded:         true,
+				Progress:             100,
+				Mediafiles:           len(files),
+				DownloadedMediafiles: len(files),
+			}
+			s.linkDbService.UpdateFilesNumber(id, linkDto)
+			return fmt.Sprintf("%d files in %s and \n page not found", len(files), link.Path), nil
+		} else {
+			return fmt.Sprintf("0 files in %s and \n page not found", link.Path), nil
+		}
+	}
+
+	isOsosedki := isOsosedkiDomain(link.Path)
+	var isTelegraph string
+	if strings.Contains(link.Path, "telegra.ph") {
+		isTelegraph = "telegra.ph"
+	}
+
+	if dir != nil && page != nil {
+		urls := getMediaUrls(page, isOsosedki, isTelegraph)
+		files, err := os.ReadDir(dirPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read directory: %s", err.Error())
+		}
+		linkDto := models.UpdateLinkDto{
+			IsDownloaded:         len(files) == len(urls),
+			Progress:             ((len(files) / len(urls)) * 100),
+			Mediafiles:           len(urls),
+			DownloadedMediafiles: len(files),
+		}
+		s.linkDbService.UpdateFilesNumber(id, linkDto)
+		return fmt.Sprintf("%d files in %s and \n page exists", len(files), link.Path), nil
+	}
+	if dir == nil && page != nil {
+		urls := getMediaUrls(page, isOsosedki, isTelegraph)
+		linkDto := models.UpdateLinkDto{
+			IsDownloaded:         false,
+			Progress:             0,
+			Mediafiles:           len(urls),
+			DownloadedMediafiles: 0,
+		}
+		s.linkDbService.UpdateFilesNumber(id, linkDto)
+		return fmt.Sprintf("0 files in %s and \n page exists", link.Path), nil
+
+	}
+
+	return fmt.Sprintf("%s  is not exists and \n page not found", link.Path), nil
+
 }
 
 func (s *LinkService) TagUnreachable(id int64, reachable bool) error {

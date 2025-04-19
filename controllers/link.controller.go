@@ -95,7 +95,13 @@ func (c *LinkController) CheckDownloaded(ctx *gin.Context) {
 		ctx.JSON(400, utils.ResultMaker("Invalid id parameter"))
 		return
 	}
-	c.linkService.CheckDownloaded(id)
+	result, err := c.linkService.CheckDownloaded(id)
+	if err != nil {
+		ctx.JSON(400, utils.ResultMaker("Failed to check downloaded status: \n"+err.Error()))
+	} else {
+		ctx.JSON(200, utils.ResultMaker(result))
+	}
+
 }
 
 func (c *LinkController) TagUnreachable(ctx *gin.Context) {

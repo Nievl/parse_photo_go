@@ -14,7 +14,7 @@ func NewMediafilesService() *MediafilesService {
 	return &MediafilesService{}
 }
 
-func (s *MediafilesService) Create(mediafile string) error {
+func (s *MediafilesService) Create(mediafile models.CreateMediafileDto) error {
 	// implementation for creating a mediafile
 	return nil
 }
