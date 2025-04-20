@@ -85,7 +85,14 @@ func (c *LinkController) ScanFilesForLink(ctx *gin.Context) {
 		ctx.JSON(400, utils.ResultMaker("Invalid id parameter"))
 		return
 	}
-	c.linkService.ScanFilesForLink(id)
+	result, err := c.linkService.ScanFilesForLink(id)
+	if err != nil {
+		ctx.JSON(400, utils.ResultMaker("Failed to scan files: \n"+err.Error()))
+		return
+	} else {
+		ctx.JSON(200, utils.ResultMaker(result))
+		return
+	}
 }
 
 func (c *LinkController) CheckDownloaded(ctx *gin.Context) {

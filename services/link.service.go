@@ -1,7 +1,9 @@
 package services
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -118,9 +120,58 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	return nil
 }
 
-func (s *LinkService) ScanFilesForLink(id int64) error {
-	// implementation for scanning files for a link by id
-	return nil
+func (s *LinkService) ScanFilesForLink(id int64) (string, error) {
+	link, err := s.linkDbService.GetOne(id)
+	if err != nil {
+		return "", fmt.Errorf("failed to get link: %s", err.Error())
+	}
+	dirPath := filepath.Join("result", link.Name)
+	_, err = os.Stat(dirPath)
+	if os.IsNotExist(err) {
+		return "", fmt.Errorf("directory %s does not exist", dirPath)
+	}
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read directory: %s", err.Error())
+	}
+	if len(files) > 0 {
+		existedMediafiles, err := s.mediafilesService.GetAllByLinkId(link.ID)
+		if err != nil {
+			return "", fmt.Errorf("failed to get mediafiles: %s", err.Error())
+		}
+		existedMediaFilesSet := make(map[string]struct{}, len(existedMediafiles))
+		for _, mediafile := range existedMediafiles {
+			existedMediaFilesSet[mediafile.Name] = struct{}{}
+		}
+		for _, file := range files {
+			fileName := file.Name()
+			if _, ok := existedMediaFilesSet[fileName]; !ok {
+				filePath := filepath.Join(dirPath, fileName)
+				hash, err := getHashByPath(filePath)
+				if err != nil {
+					fmt.Printf("failed to get hash: %s", err.Error())
+				}
+				info, _ := os.Stat(filePath)
+				mediaFile := models.CreateMediafileDto{
+					Name:   fileName,
+					Path:   filePath,
+					Hash:   hash,
+					Size:   info.Size(),
+					LinkID: link.ID,
+				}
+				err = s.mediafilesService.Create(mediaFile)
+				if err != nil {
+					fmt.Printf("failed to create mediafile: %s", err.Error())
+				}
+			}
+
+		}
+
+	} else {
+		return "", fmt.Errorf("directory %s is empty", dirPath)
+	}
+
+	return fmt.Sprintf("files link %s scanned"), nil
 }
 
 func (s *LinkService) CheckDownloaded(id int64) (string, error) {
@@ -275,6 +326,23 @@ func getHighResUrl(url string) string {
 	}
 	return url
 
+}
+
+func getHashByPath(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %s", err.Error())
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	_, err = io.Copy(hasher, file)
+	if err != nil {
+		return "", fmt.Errorf("failed to copy file: %s", err.Error())
+	}
+
+	hash := hasher.Sum(nil)
+	return fmt.Sprintf("%x", hash), nil
 }
 
 var EXTENSIONS = map[string]struct{}{"jpeg": {}, "jpg": {}, "mp4": {}, "png": {}, "gif": {}, "webp": {}}
