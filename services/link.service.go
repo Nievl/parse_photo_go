@@ -195,7 +195,7 @@ func (s *LinkService) ScanFilesForLink(id int64) (string, error) {
 		return "", fmt.Errorf("directory %s is empty", dirPath)
 	}
 
-	return fmt.Sprintf("files link %s scanned"), nil
+	return fmt.Sprintf("files link %s scanned", link.Path), nil
 }
 
 func (s *LinkService) CheckDownloaded(id int64) (string, error) {
