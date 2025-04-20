@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"parse_photo_go/domains"
@@ -64,40 +66,57 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	if err != nil {
 		return fmt.Errorf("failed to create directory: %s", err.Error())
 	}
-	var downloadedCount, totalFiles int
 
-	downloadedMediafiles := make([]models.CreateMediafileDto, 0, len(urls))
+	var (
+		downloadedCount      int64
+		downloadedMediafiles = make([]models.CreateMediafileDto, 0, len(urls))
+		downloadedMu         sync.Mutex
+		wg                   sync.WaitGroup
+		sem                  = make(chan struct{}, 5) // лимит 5 одновременных загрузок
+	)
 
 	for _, url := range urls {
-		cleanUrl := strings.Split(url, "?")[0]
-		fileName := filepath.Base(cleanUrl)
-		ext := strings.TrimPrefix(filepath.Ext(fileName), ".")
-		if _, ok := EXTENSIONS[ext]; !ok {
-			continue
-		}
-		totalFiles++
-		filePath := filepath.Join(dirPath, fileName)
-		fullUrl := url
-		if !strings.HasPrefix(url, "http") {
-			fullUrl = link.Path + url
-		}
+		url := url
+		wg.Add(1)
+		sem <- struct{}{} // блокируем семафор
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }() // освобождаем семафор
 
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			fullUrl = getHighResUrl(fullUrl)
-			res, err := s.mediafilesService.DownloadFile(fullUrl, filePath, link.ID)
-			if err != nil {
-				fmt.Printf("failed to download file: %s", err.Error())
-			} else {
-				downloadedMediafiles = append(downloadedMediafiles, res)
-				downloadedCount++
+			cleanUrl := strings.Split(url, "?")[0]
+			fileName := filepath.Base(cleanUrl)
+			ext := strings.TrimPrefix(filepath.Ext(fileName), ".")
+			if _, ok := EXTENSIONS[ext]; !ok {
+				return
 			}
 
-		} else {
-			downloadedCount++
-			continue
-		}
+			filePath := filepath.Join(dirPath, fileName)
+			fullUrl := url
+			if !strings.HasPrefix(url, "http") {
+				fullUrl = link.Path + url
+			}
 
+			if _, err := os.Stat(filePath); os.IsNotExist(err) {
+				fullUrl = getHighResUrl(fullUrl)
+				res, err := s.mediafilesService.DownloadFile(fullUrl, filePath, link.ID)
+				if err != nil {
+					fmt.Printf("failed to download file: %s", err.Error())
+				} else {
+					downloadedMu.Lock()
+					downloadedMediafiles = append(downloadedMediafiles, res)
+					downloadedCount++
+					downloadedMu.Unlock()
+				}
+
+			} else {
+				atomic.AddInt64(&downloadedCount, 1)
+
+			}
+		}()
 	}
+
+	wg.Wait()
+	totalFiles := len(urls)
 
 	for _, mediafile := range downloadedMediafiles {
 		err := s.mediafilesService.Create(mediafile)
@@ -107,10 +126,10 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	}
 
 	linkDto := models.UpdateLinkDto{
-		IsDownloaded:         downloadedCount == totalFiles,
-		Progress:             ((downloadedCount / totalFiles) * 100),
+		IsDownloaded:         downloadedCount == int64(totalFiles),
+		Progress:             int((float64(downloadedCount) / float64(totalFiles)) * 100),
 		Mediafiles:           totalFiles,
-		DownloadedMediafiles: downloadedCount,
+		DownloadedMediafiles: int(downloadedCount),
 	}
 
 	s.linkDbService.UpdateFilesNumber(id, linkDto)
