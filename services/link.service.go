@@ -1,10 +1,7 @@
 package services
 
 import (
-	"crypto/sha256"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +11,7 @@ import (
 
 	"parse_photo_go/domains"
 	"parse_photo_go/models"
+	"parse_photo_go/utils"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -59,7 +57,7 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	isOsosedki := isOsosedkiDomain(link.Path)
 	var isTelegraph string
 	if strings.Contains(link.Path, "telegra.ph") {
-		isTelegraph = "telegra.ph"
+		isTelegraph = "https://telegra.ph"
 	}
 	urls := getMediaUrls(page, isOsosedki, isTelegraph)
 	dirPath, err := createDirectory(link.Name)
@@ -88,7 +86,7 @@ func (s *LinkService) DownloadFiles(id int64) error {
 			fullUrl = getHighResUrl(fullUrl)
 			res, err := s.mediafilesService.DownloadFile(fullUrl, filePath, link.ID)
 			if err != nil {
-				log.Fatalf("failed to download file: %s", err.Error())
+				fmt.Printf("failed to download file: %s", err.Error())
 			} else {
 				downloadedMediafiles = append(downloadedMediafiles, res)
 				downloadedCount++
@@ -99,6 +97,13 @@ func (s *LinkService) DownloadFiles(id int64) error {
 			continue
 		}
 
+	}
+
+	for _, mediafile := range downloadedMediafiles {
+		err := s.mediafilesService.Create(mediafile)
+		if err != nil {
+			fmt.Printf("failed to create mediafile: %s\n", err.Error())
+		}
 	}
 
 	linkDto := models.UpdateLinkDto{
@@ -147,7 +152,7 @@ func (s *LinkService) ScanFilesForLink(id int64) (string, error) {
 			fileName := file.Name()
 			if _, ok := existedMediaFilesSet[fileName]; !ok {
 				filePath := filepath.Join(dirPath, fileName)
-				hash, err := getHashByPath(filePath)
+				hash, err := utils.GetHashByPath(filePath)
 				if err != nil {
 					fmt.Printf("failed to get hash: %s", err.Error())
 				}
@@ -209,7 +214,7 @@ func (s *LinkService) CheckDownloaded(id int64) (string, error) {
 	isOsosedki := isOsosedkiDomain(link.Path)
 	var isTelegraph string
 	if strings.Contains(link.Path, "telegra.ph") {
-		isTelegraph = "telegra.ph"
+		isTelegraph = "https://telegra.ph"
 	}
 
 	if dir != nil && page != nil {
@@ -220,7 +225,7 @@ func (s *LinkService) CheckDownloaded(id int64) (string, error) {
 		}
 		linkDto := models.UpdateLinkDto{
 			IsDownloaded:         len(files) == len(urls),
-			Progress:             ((len(files) / len(urls)) * 100),
+			Progress:             int((float64(len(files)) / float64(len(urls))) * 100),
 			Mediafiles:           len(urls),
 			DownloadedMediafiles: len(files),
 		}
@@ -326,23 +331,6 @@ func getHighResUrl(url string) string {
 	}
 	return url
 
-}
-
-func getHashByPath(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %s", err.Error())
-	}
-	defer file.Close()
-
-	hasher := sha256.New()
-	_, err = io.Copy(hasher, file)
-	if err != nil {
-		return "", fmt.Errorf("failed to copy file: %s", err.Error())
-	}
-
-	hash := hasher.Sum(nil)
-	return fmt.Sprintf("%x", hash), nil
 }
 
 var EXTENSIONS = map[string]struct{}{"jpeg": {}, "jpg": {}, "mp4": {}, "png": {}, "gif": {}, "webp": {}}

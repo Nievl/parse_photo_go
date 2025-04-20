@@ -11,8 +11,9 @@ import (
 
 func InitRoutes(app *gin.Engine, db *bun.DB) {
 	linkDbService := domains.NewLinksDbService(db)
-	mediafilesDbService := services.NewMediafilesService()
-	linkService := services.NewLinkService(*linkDbService, *mediafilesDbService)
+	mediafilesDbService := domains.NewMediafilesDbService(db)
+	mediafilesService := services.NewMediafilesService(*mediafilesDbService)
+	linkService := services.NewLinkService(*linkDbService, *mediafilesService)
 	linkController := controllers.NewLinkController(*linkService)
 
 	app.POST("/links", linkController.Create)
