@@ -68,11 +68,11 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	}
 
 	var (
-		downloadedCount      int64
+		downloadedCount      int32
 		downloadedMediafiles = make([]models.CreateMediafileDto, 0, len(urls))
 		downloadedMu         sync.Mutex
 		wg                   sync.WaitGroup
-		sem                  = make(chan struct{}, 5) // лимит 5 одновременных загрузок
+		sem                  = make(chan struct{}, 5)
 	)
 
 	for _, url := range urls {
@@ -109,7 +109,7 @@ func (s *LinkService) DownloadFiles(id int64) error {
 				}
 
 			} else {
-				atomic.AddInt64(&downloadedCount, 1)
+				atomic.AddInt32(&downloadedCount, 1)
 
 			}
 		}()
@@ -126,7 +126,7 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	}
 
 	linkDto := models.UpdateLinkDto{
-		IsDownloaded:         downloadedCount == int64(totalFiles),
+		IsDownloaded:         downloadedCount == int32(totalFiles),
 		Progress:             int((float64(downloadedCount) / float64(totalFiles)) * 100),
 		Mediafiles:           totalFiles,
 		DownloadedMediafiles: int(downloadedCount),
