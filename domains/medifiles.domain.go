@@ -23,7 +23,9 @@ func (m *MedifilesDbService) Create(mediafile models.CreateMediafileDto, linkId 
 
 	tx, _ := m.db.BeginTx(ctx, nil)
 	defer tx.Commit()
-	_, err := tx.Exec("INSERT INTO mediafiles (name, path, hash, size) VALUES (?, ?, ?, ?)",
+	_, err := tx.Exec(`
+		INSERT OR IGNORE INTO mediafiles (name, path, hash, size)
+	 	VALUES (?, ?, ?, ?)`,
 		mediafile.Name,
 		mediafile.Path,
 		mediafile.Hash,
@@ -33,7 +35,7 @@ func (m *MedifilesDbService) Create(mediafile models.CreateMediafileDto, linkId 
 		return fmt.Errorf("failed to insert mediafile: %s", err.Error())
 	}
 	_, err = tx.Exec(`
-		INSERT INTO links_mediafiles (link_id, mediafile_id) 
+		INSERT OR IGNORE INTO mediafiles_links (link_id, mediafile_id) 
 		VALUES (?, 
 			(SELECT id as mediafile_id
 			FROM mediafiles
@@ -56,7 +58,7 @@ func (m *MedifilesDbService) GetAllByLinkId(linkId int) ([]models.Mediafile, err
 	result := []models.Mediafile{}
 	query := m.db.NewSelect().Model(&result).
 		TableExpr("mediafiles AS m").
-		Join("JOIN links_medifiles AS lm ON lm.medifile_id = m.id").
+		Join("JOIN mediafiles_links AS lm ON lm.mediafile_id = m.id").
 		Where("lm.link_id = ?", linkId)
 
 	err := query.Scan(ctx)
