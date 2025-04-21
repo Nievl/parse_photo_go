@@ -29,6 +29,7 @@ func (m *MedifilesDbService) Create(mediafile models.CreateMediafileDto, linkId 
 		mediafile.Hash,
 		mediafile.Size)
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to insert mediafile: %s", err.Error())
 	}
 	_, err = tx.Exec(`
@@ -39,6 +40,7 @@ func (m *MedifilesDbService) Create(mediafile models.CreateMediafileDto, linkId 
 			WHERE path = ?)
 		)`, linkId, mediafile.Path)
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("failed to insert link_mediafile: %s", err.Error())
 	}
 
@@ -50,5 +52,16 @@ func (m *MedifilesDbService) Remove(id int) error {
 }
 
 func (m *MedifilesDbService) GetAllByLinkId(linkId int) ([]models.Mediafile, error) {
-	return nil, nil
+	ctx := context.Background()
+	result := []models.Mediafile{}
+	query := m.db.NewSelect().Model(&result).
+		TableExpr("mediafiles AS m").
+		Join("JOIN links_medifiles AS lm ON lm.medifile_id = m.id").
+		Where("lm.link_id = ?", linkId)
+
+	err := query.Scan(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mediafiles: %s", err.Error())
+	}
+	return result, nil
 }
