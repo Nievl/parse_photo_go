@@ -18,8 +18,8 @@ func NewMediafilesService(mediafilesDbService domains.MedifilesDbService) *Media
 	}
 }
 
-func (s *MediafilesService) Create(mediafile models.CreateMediafileDto) error {
-	return s.mediafilesDbService.Create(mediafile)
+func (s *MediafilesService) Create(mediafile models.CreateMediafileDto, linkId int) error {
+	return s.mediafilesDbService.Create(mediafile, linkId)
 }
 
 func (s *MediafilesService) Remove(id int) error {
@@ -30,7 +30,7 @@ func (s *MediafilesService) GetAllByLinkId(linkId int) ([]models.Mediafile, erro
 	return s.mediafilesDbService.GetAllByLinkId(linkId)
 }
 
-func (s *MediafilesService) DownloadFile(url string, filePath string, linkId int) (models.CreateMediafileDto, error) {
+func (s *MediafilesService) DownloadFile(url string, filePath string) (models.CreateMediafileDto, error) {
 
 	err := Download(url, filePath)
 	if err != nil {
@@ -42,11 +42,10 @@ func (s *MediafilesService) DownloadFile(url string, filePath string, linkId int
 	}
 	info, _ := os.Stat(filePath)
 	mediafile := models.CreateMediafileDto{
-		Hash:   hash,
-		Name:   "",
-		Path:   filePath,
-		Size:   info.Size(),
-		LinkID: linkId,
+		Hash: hash,
+		Name: "",
+		Path: filePath,
+		Size: info.Size(),
 	}
 
 	return mediafile, nil

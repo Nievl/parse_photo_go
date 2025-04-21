@@ -7,11 +7,10 @@ import (
 )
 
 type CreateMediafileDto struct {
-	Name   string `bun:"name" json:"name"`
-	Path   string `bun:"path" json:"path"`
-	Hash   string `bun:"hash" json:"hash"`
-	Size   int64  `bun:"size" json:"size"`
-	LinkID int    `bun:"link_id" json:"linkId"` // Преобразуем строку в int
+	Name string `bun:"name" json:"name"`
+	Path string `bun:"path" json:"path"`
+	Hash string `bun:"hash" json:"hash"`
+	Size int64  `bun:"size" json:"size"`
 }
 
 type Mediafile struct {

@@ -98,7 +98,7 @@ func (s *LinkService) DownloadFiles(id int64) error {
 
 			if _, err := os.Stat(filePath); os.IsNotExist(err) {
 				fullUrl = getHighResUrl(fullUrl)
-				res, err := s.mediafilesService.DownloadFile(fullUrl, filePath, link.ID)
+				res, err := s.mediafilesService.DownloadFile(fullUrl, filePath)
 				if err != nil {
 					fmt.Printf("failed to download file: %s", err.Error())
 				} else {
@@ -119,7 +119,7 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	totalFiles := len(urls)
 
 	for _, mediafile := range downloadedMediafiles {
-		err := s.mediafilesService.Create(mediafile)
+		err := s.mediafilesService.Create(mediafile, link.ID)
 		if err != nil {
 			fmt.Printf("failed to create mediafile: %s\n", err.Error())
 		}
@@ -135,7 +135,7 @@ func (s *LinkService) DownloadFiles(id int64) error {
 	s.linkDbService.UpdateFilesNumber(id, linkDto)
 
 	for _, mediafile := range downloadedMediafiles {
-		err := s.mediafilesService.Create(mediafile)
+		err := s.mediafilesService.Create(mediafile, link.ID)
 		if err != nil {
 			fmt.Printf("failed to create mediafile: %s\n", err.Error())
 		}
@@ -177,13 +177,12 @@ func (s *LinkService) ScanFilesForLink(id int64) (string, error) {
 				}
 				info, _ := os.Stat(filePath)
 				mediaFile := models.CreateMediafileDto{
-					Name:   fileName,
-					Path:   filePath,
-					Hash:   hash,
-					Size:   info.Size(),
-					LinkID: link.ID,
+					Name: fileName,
+					Path: filePath,
+					Hash: hash,
+					Size: info.Size(),
 				}
-				err = s.mediafilesService.Create(mediaFile)
+				err = s.mediafilesService.Create(mediaFile, link.ID)
 				if err != nil {
 					fmt.Printf("failed to create mediafile: %s", err.Error())
 				}
