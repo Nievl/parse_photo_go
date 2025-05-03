@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"parse_photo_go/models"
 
 	"github.com/uptrace/bun"
@@ -14,15 +13,11 @@ import (
 	"github.com/uptrace/bun/driver/sqliteshim"
 )
 
-func CheckAndCreateTables() (*bun.DB, error) {
-	dbName := os.Getenv("DB_NAME")
-	if dbName == "" {
-		return nil, fmt.Errorf("DB_NAME is not set in environment")
-	}
+func CheckAndCreateTables(dbPath string) (*bun.DB, error) {
 
-	log.Println("Reading DB file, DB_NAME:", dbName)
+	log.Println("Reading DB file, DB_NAME:", dbPath)
 
-	dsn := fmt.Sprintf("file:%s?cache=shared&mode=rwc", dbName)
+	dsn := fmt.Sprintf("file:%s?cache=shared&mode=rwc", dbPath)
 	sqldb, err := sql.Open(sqliteshim.ShimName, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %v", err)

@@ -4,3 +4,4 @@ go.sum
 *.exe
 /tmp
 result
+/config/local.yaml

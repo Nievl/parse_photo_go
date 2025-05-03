@@ -2,32 +2,26 @@ package main
 
 import (
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"parse_photo_go/domains"
+	"parse_photo_go/models"
 	"parse_photo_go/routers"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 func main() {
 	log.Println("server starting...")
 
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	cfg := models.MustLoadConfig()
+	log := Loger(cfg.Env)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "3000"
-	}
-
-	db, err := domains.CheckAndCreateTables()
+	db, err := domains.CheckAndCreateTables(cfg.StoragePath)
 	if err != nil {
-		log.Fatalf("Error creating tables: %v", err)
+		log.Error("Error creating tables: %v", err)
 	}
 
 	r := gin.Default()
@@ -36,6 +30,18 @@ func main() {
 	r.GET("/", func(c *gin.Context) { c.File("./static/index.html") }) // Отдаём index.html при запросе на "/"
 	r.GET("/ping", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"message": "ok"}) })
 	routers.InitRoutes(r, db)
-	r.Run(":" + port)
+	r.Run(cfg.Address)
 
+}
+
+func Loger(env string) *slog.Logger {
+	var log *slog.Logger
+
+	switch env {
+	case "local":
+		log = slog.New(
+			slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	}
+
+	return log
 }
